@@ -37,7 +37,7 @@
     <Released>true</Released>
     <Company>CleanGreens SA</Company>
     <Title>CL_TelegramTxtLogLibrary</Title>
-    <ProjectVersion>2.0.1</ProjectVersion>
+    <ProjectVersion>2.0.2</ProjectVersion>
     <DefaultNamespace>
     </DefaultNamespace>
     <Author>Massimo Lucano</Author>
@@ -96,6 +96,10 @@
     <PlaceholderReference Include="Tc2_System">
       <DefaultResolution>Tc2_System, * (Beckhoff Automation GmbH)</DefaultResolution>
       <Namespace>Tc2_System</Namespace>
+    </PlaceholderReference>
+    <PlaceholderReference Include="Tc2_Utilities">
+      <DefaultResolution>Tc2_Utilities, * (Beckhoff Automation GmbH)</DefaultResolution>
+      <Namespace>Tc2_Utilities</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="Tc3_IotBase">
       <DefaultResolution>Tc3_IotBase, * (Beckhoff Automation GmbH)</DefaultResolution>
