@@ -37,10 +37,12 @@
     <Released>true</Released>
     <Company>CleanGreens SA</Company>
     <Title>CL_TelegramTxtLogLibrary</Title>
-    <ProjectVersion>1.0.2</ProjectVersion>
-    <DefaultNamespace>CGS_TelegramTxtLogLibrary</DefaultNamespace>
+    <ProjectVersion>2.0</ProjectVersion>
+    <DefaultNamespace>
+    </DefaultNamespace>
     <Author>Massimo Lucano</Author>
     <Description>Telegram API implementation, TextLOg implementation, Link between CL_DefectManager and Telegram and TextLog</Description>
+    <Placeholder>CGS_TelegramTxtLogLibrary</Placeholder>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="DUTs\enBOT_API.TcTLEO">
@@ -85,6 +87,7 @@
     </PlaceholderReference>
     <PlaceholderReference Include="CGS_ObjectsLibrary">
       <DefaultResolution>CL_CleanGreensObjectsLibrary, * (CleanGreens SA)</DefaultResolution>
+      <Namespace>CL_CleanGreensObjectsLibrary</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="Tc2_Standard">
       <DefaultResolution>Tc2_Standard, * (Beckhoff Automation GmbH)</DefaultResolution>
@@ -114,8 +117,8 @@
   <ProjectExtensions>
     <PlcProjectOptions>
       <XmlArchive>
-  <Data>
-    <o xml:space="preserve" t="OptionKey">
+        <Data>
+          <o xml:space="preserve" t="OptionKey">
       <v n="Name">"&lt;ProjectRoot&gt;"</v>
       <d n="SubKeys" t="Hashtable" ckt="String" cvt="OptionKey">
         <v>{40450F57-0AA3-4216-96F3-5444ECB29763}</v>
@@ -136,13 +139,13 @@
       </d>
       <d n="Values" t="Hashtable" />
     </o>
-  </Data>
-  <TypeList>
-    <Type n="Hashtable">System.Collections.Hashtable</Type>
-    <Type n="OptionKey">{54dd0eac-a6d8-46f2-8c27-2f43c7e49861}</Type>
-    <Type n="String">System.String</Type>
-  </TypeList>
-</XmlArchive>
+        </Data>
+        <TypeList>
+          <Type n="Hashtable">System.Collections.Hashtable</Type>
+          <Type n="OptionKey">{54dd0eac-a6d8-46f2-8c27-2f43c7e49861}</Type>
+          <Type n="String">System.String</Type>
+        </TypeList>
+      </XmlArchive>
     </PlcProjectOptions>
   </ProjectExtensions>
 </Project>
