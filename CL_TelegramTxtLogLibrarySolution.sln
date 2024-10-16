@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # TcXaeShell Solution File, Format Version 11.00
 VisualStudioVersion = 15.0.33403.129
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{B1E792BE-AA5F-4E3C-8C82-674BF9C0715B}") = "CL_TelegramTxtLogLibraryProject", "..\CL_TelegramTxtLogLibraryProject\CL_TelegramTxtLogLibraryProject.tsproj", "{989C8F7C-DEA7-4D78-BAB0-1D15E804D618}"
+Project("{B1E792BE-AA5F-4E3C-8C82-674BF9C0715B}") = "CL_TelegramTxtLogLibraryProject", "CL_TelegramTxtLogLibraryProject\CL_TelegramTxtLogLibraryProject.tsproj", "{989C8F7C-DEA7-4D78-BAB0-1D15E804D618}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

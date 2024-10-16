@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <DUT Name="ST_getMe" Id="{d0c4beb8-91d7-475b-81e7-bc5f02710599}">
+    <Declaration><![CDATA[TYPE ST_getMe :
+STRUCT
+	id 						              : ULINT;
+	first_name				          : T_MaxString;//BOT name
+	username				            : T_MaxString;//owner name
+  is_bot					            : BOOL;
+	can_join_groups			        : BOOL;
+	can_read_all_group_messages : BOOL;
+	supports_inline_queries	    : BOOL;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

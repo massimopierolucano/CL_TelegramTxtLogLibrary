@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <DUT Name="ST_TelegramInit" Id="{e3a7d11b-58a9-41fd-b92c-67aaeda5541f}">
+    <Declaration><![CDATA[TYPE ST_TelegramInit :
+STRUCT
+  sBOTKey   		  : STRING(64);//BOT key to exchange operator messages
+	sDebugID   		  : STRING(32);//chat group ID to send debug messages Info et Verbose
+	sAlarmID   		  : STRING(32);//chat group ID to send Critical,Error,Warning alarms
+	sBOTname  		  : STRING(40);
+	sBOTusername  	: STRING(40);
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

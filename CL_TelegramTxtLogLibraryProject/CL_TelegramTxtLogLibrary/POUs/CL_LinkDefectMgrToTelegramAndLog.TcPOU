@@ -1,0 +1,289 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="CL_LinkDefectMgrToTelegramAndLog" Id="{bd3abd17-e119-4492-88fb-5fb9a74ccd54}" SpecialFunc="None">
+    <Declaration><![CDATA[{attribute 'enable_dynamic_creation'}
+FUNCTION_BLOCK CL_LinkDefectMgrToTelegramAndLog EXTENDS CL_MasterRootClass
+VAR
+  bInit                   : BOOL := FALSE;
+	_DefectMngr             : REFERENCE TO CL_DefectManager;
+  _TelegramBOT            : REFERENCE TO CL_TelegramBOT;
+  _TxtLog                 : REFERENCE TO CL_TextLog;
+  _ActTime                :	REFERENCE TO CL_ActTimeDate;
+  
+  indDfList					      : UINT := 1;
+
+  _bShowDateTime          : BOOL := FALSE;
+  _bShowRegisterMsg       : BOOL := FALSE;
+	_bMakeTxtLOG 		        : BOOL := FALSE;
+  _bAllDefectsRegistered  : BOOL := FALSE;
+	
+	sTelegramMsg_P	        : POINTER TO T_StringBuffer;//used to generate very long Telegram messages limited to 3500 chars
+	sTextOut_P          : POINTER TO T_StringBuffer;//used to generate short ADS console messages limited to 255 chars
+  
+	pDf			      		      : POINTER TO CL_Defect;
+	iDf		        		      : ITF_Defect;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[//IF bInit and _bAllDefectsRegistered THEN
+IF bInit THEN
+  this^.Run(); 
+END_IF]]></ST>
+    </Implementation>
+    <Method Name="AddDateTime" Id="{4095967f-1e6c-4d2d-9fdf-f031db0e2961}">
+      <Declaration><![CDATA[METHOD PRIVATE AddDateTime
+VAR_IN_OUT
+	sMsgTimeCreation	: T_MaxString;
+END_VAR
+VAR
+  sDatetime         : T_MaxString;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[(*
+sBOTMsgTimeCreation^ := DT_TO_STRING(_objActTime_R.GetDateTime);
+sBOTMsgTimeCreation^ := REPLACE(sBOTMsgTimeCreation^,' ',1,3);
+sBOTMsgTimeCreation^ := CONCAT(' ',sBOTMsgTimeCreation^);
+//sBOTMsgTimeCreation^ := CONCAT(sBOTMsgTimeCreation^,'%0A');
+sBOTMsgTimeCreation^ := CONCAT(sBOTMsgTimeCreation^,'  ');
+*)
+
+(*
+sMsgTimeCreation := concat(sMsgTimeCreation,_ActTime.GetStrDateTime());//2024-10-15-23:16:25
+sMsgTimeCreation := REPLACE(sMsgTimeCreation,' ',1,11);
+sMsgTimeCreation := CONCAT('Date: ', sMsgTimeCreation);
+sMsgTimeCreation := CONCAT(sMsgTimeCreation,'  ');
+*)
+
+sMsgTimeCreation := CONCAT(sMsgTimeCreation,'  Date: ');
+sDatetime := _ActTime.GetStrDateTime();//2024-10-15-23:16:25
+sDatetime := REPLACE(sDatetime,' ',1,11);
+sMsgTimeCreation := CONCAT(sMsgTimeCreation,sDatetime);]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="AllDefectsRegistered" Id="{1c8b8e73-0d3a-484b-9edf-010e8c63c25b}">
+      <Declaration><![CDATA[PROPERTY PUBLIC AllDefectsRegistered : BOOL]]></Declaration>
+      <Get Name="Get" Id="{62fe80e3-e684-4641-a14c-58c7f66c300c}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[AllDefectsRegistered := _bAllDefectsRegistered;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{79d2daf0-2965-41ad-bffe-6b518db19546}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_bAllDefectsRegistered := AllDefectsRegistered;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="BuildMsg" Id="{a5846a05-374c-4f5a-b86f-1042d24e98b9}">
+      <Declaration><![CDATA[METHOD PRIVATE BuildMsg : BOOL
+VAR_INPUT
+  MsgType : E_MsgType;
+END_VAR
+VAR
+  bShowIstance            : BOOL;
+  bShowLongError          : BOOL;
+  bShowLongClass          : BOOL;
+  sStartMsg               : T_MAXSTRING;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[//%0A telegram new line
+CASE MsgType OF
+  E_MsgType.Alarm:
+    bShowIstance := FALSE;
+    bShowLongError := true;
+    bShowLongClass := FALSE;
+    sStartMsg := 'ALLARM MESSAGE';
+  E_MsgType.Info:
+    bShowIstance := TRUE;
+    bShowLongError := FALSE;
+    bShowLongClass := FALSE;
+    sStartMsg := 'INFO MESSAGE';
+  E_MsgType.Register:
+    bShowIstance := TRUE;
+    bShowLongError := FALSE;
+    bShowLongClass := FALSE;
+    sStartMsg := 'Register new defect';
+END_CASE   
+sTelegramMsg_P^ := '';
+sTextOut_P^ := '';
+BuildMsg := pDf^.BuildStringMsg(sMsgOut_P := sTelegramMsg_P, 
+                                    sTextOut_P := sTextOut_P, 
+                                    bConsoleMsg := _bMakeTxtLOG,
+                                    bShowIstance := bShowIstance,
+                                    bShowLongClass := bShowLongClass,
+                                    bShowLongError := bShowLongError,
+                                    bShowRemedMsg := FALSE);    
+                                    
+IF _bShowDateTime THEN 
+  AddDateTime(sStartMsg);
+END_IF  
+CONCAT2(ADR(sStartMsg),sTelegramMsg_P,sTelegramMsg_P,SIZEOF(sTelegramMsg_P^));
+CONCAT2(ADR(sStartMsg),sTextOut_P,sTextOut_P,SIZEOF(sTextOut_P^));]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Init" Id="{e53ab38c-96f3-4595-9dcb-80606fd15102}">
+      <Declaration><![CDATA[METHOD PUBLIC Init : BOOL
+VAR_INPUT
+  stIrrLine        : ST_LineReference;
+  DefectMngr       : REFERENCE TO CL_DefectManager;
+  TelegramBOT      : REFERENCE TO CL_TelegramBOT;
+  TxtLog           : REFERENCE TO CL_TextLog;
+  ActTime          : REFERENCE TO CL_ActTimeDate;
+  bShowDateTime    : BOOL := FALSE;
+  bShowRegisterMsg : BOOL := FALSE;
+	bShowTxtLog 		 : BOOL := FALSE;
+END_VAR
+VAR
+  bufferSize       : UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bInit := Init := FALSE;
+IF __ISVALIDREF(DefectMngr) AND __ISVALIDREF(TelegramBOT) AND __ISVALIDREF(TxtLog) THEN 
+	_DefectMngr REF= DefectMngr;
+  _TelegramBOT REF= TelegramBOT;
+  _TxtLog REF= TxtLog;
+  _ActTime REF= ActTime;
+  
+  MRLineRef := stIrrLine;
+
+  indDfList := 1;
+	_bShowDateTime := bShowDateTime;
+  
+  bufferSize := SIZEOF(T_StringBuffer)+4;
+  sTelegramMsg_P := __NEW(BYTE, bufferSize);
+  sTextOut_P := __NEW(BYTE, bufferSize);
+
+  _bShowDateTime    := bShowDateTime;
+  _bShowRegisterMsg := bShowRegisterMsg;
+	_bMakeTxtLOG 		  := bShowTxtLog;
+
+  bInit := Init := sTelegramMsg_P <> 0 AND sTextOut_P <> 0;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="RegisterAllMsgSent" Id="{8ce1c373-3a44-4ce3-99de-0f2c96643762}">
+      <Declaration><![CDATA[PROPERTY PUBLIC RegisterAllMsgSent : BOOL]]></Declaration>
+      <Get Name="Get" Id="{83921c70-fa44-461e-8e77-81aec684960c}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[RegisterAllMsgSent := not _bShowRegisterMsg;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="Release" Id="{f084cedf-9488-4ccc-9979-c6f3f39bdb57}">
+      <Declaration><![CDATA[METHOD PUBLIC Release : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bInit := FALSE;
+IF sTelegramMsg_P <> 0  THEN 
+  __DELETE(sTelegramMsg_P);
+END_IF
+
+IF sTextOut_P <> 0  THEN 
+  __DELETE(sTelegramMsg_P);
+END_IF
+
+Release := sTelegramMsg_P = 0 AND sTextOut_P = 0;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Run" Id="{d1739173-161d-4fc4-ba51-c3859ce315dc}">
+      <Declaration><![CDATA[METHOD PRIVATE Run
+VAR
+  bDefectToSend	: BOOL;
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT _TelegramBOT.IsBusy AND NOT _TxtLog.IsBusy THEN  
+	IF _DefectMngr.List(indDfList,0) <> 0 THEN
+		iDf := _DefectMngr.List(indDfList,0)^;
+		IF __QUERYPOINTER(iDf, pDf) THEN // Ctrl if address has the good interface (ITF_Default)
+      pDf := _DefectMngr.List(indDfList,0);  
+      IF _bShowRegisterMsg then
+        RunRegister();
+        IF (indDfList > _DefectMngr.nMaxDefects) THEN //all Defect Register Messages sent
+          _bShowRegisterMsg := false;//Register all defects done; the object can send starting from now Alarm and Info messages
+				END_IF
+			else
+        bDefectToSend := pDf^.State = E_DefectState.Active OR pDf^.State = E_DefectState.ActiveAndAck;
+        IF bDefectToSend THEN 
+          RunAlarm();        
+          RunInfo();
+        END_IF//pDf^.State = E_DefectState.Active OR pDf^.State = E_DefectState.ActiveAndAck;
+      END_IF
+    END_IF//__QUERYPOINTER
+  END_IF//_DefectMngr.List(indDfList,0) <> 0 
+
+  //Telegram and TextLog not Busy --> increment at each cycle the Defect index
+  indDfList := indDfList + 1;
+  IF (indDfList > _DefectMngr.nMaxDefects) THEN	// Constant not accessible defect manager, or yes. Actually yes, but access through GVL not suitable!	
+    indDfList := 1;
+    _bShowRegisterMsg := false;//after first pass all register messages are sent, do not send anymore
+  END_IF 
+END_IF//TelegramBOT and TextLog both are not busy]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RunAlarm" Id="{71210b3a-a1f9-46bc-8caf-21060bf37ca6}">
+      <Declaration><![CDATA[METHOD PRIVATE RunAlarm
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[//TcEventSeverity : (Verbose:=0, Info:=1, Warning:=2, Error:=3, Critical:=4);
+IF pDf^.CanSendAlarmMsg AND (pDf^.Severity > TcEventSeverity.Info) THEN //Telegram msg not yet sent   
+  //Critical, Error and Warning Defect are sent to Alarm group
+  IF BuildMsg(E_MsgType.Alarm) THEN
+    IF _bMakeTxtLOG THEN 
+      _TxtLog.RequWriteMsg(sTextOut_P);
+    END_IF
+    _TelegramBOT.RequSendMsgToAlarm(sTelegramMsg_P);
+  END_IF					
+END_IF//pDf^.Severity... and pDf^.CanSendTelegramAlarmMsg
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RunInfo" Id="{a768a1da-2322-4a89-aa68-b19e75165cb7}">
+      <Declaration><![CDATA[METHOD PRIVATE RunInfo
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[//TcEventSeverity : (Verbose:=0, Info:=1, Warning:=2, Error:=3, Critical:=4);
+//sendMsgToAlarm and sendMsgToInfo cannot be executed together; sendMsgToInfo can be requested only once AlarmMsgAlreadySent is true and TelegramBOT is again not busy
+//IF (pDf^.CanSendInfoMsg AND (pDf^.Severity <= TcEventSeverity.Info)) OR (pDf^.CanSendInfoMsg AND (pDf^.Severity > TcEventSeverity.Info) AND pDf^.AlarmMsgAlreadySent) THEN
+IF (pDf^.CanSendInfoMsg AND (pDf^.Severity <= TcEventSeverity.Info)) THEN
+  //Verbose and Info Defect are sent only to InfoDebug group
+  IF BuildMsg(E_MsgType.Info) THEN
+    _TelegramBOT.RequSendMsgToInfo(sTelegramMsg_P);
+    IF _bMakeTxtLOG THEN 
+      _TxtLog.RequWriteMsg(sTextOut_P);
+    END_IF
+  END_IF
+END_IF//pDf^.Severity... and pDf^.CanSendTelegramAlarmMsg]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RunRegister" Id="{78317fd1-ee34-4bb9-978c-0c545c1f7e8b}">
+      <Declaration><![CDATA[METHOD PRIVATE RunRegister
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF pDf^.CanSendRegisterMsg AND _bShowRegisterMsg THEN //all Defect registered are sent
+  IF BuildMsg(E_MsgType.Register) THEN
+   IF _bMakeTxtLOG THEN 
+    _TxtLog.RequWriteMsg(sTextOut_P);
+   END_IF
+   _TelegramBOT.RequSendMsgToInfo(sTelegramMsg_P);
+  END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

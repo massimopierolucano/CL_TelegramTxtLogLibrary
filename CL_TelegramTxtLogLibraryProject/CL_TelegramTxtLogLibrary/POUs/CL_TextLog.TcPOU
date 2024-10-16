@@ -1,0 +1,223 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="CL_TextLog" Id="{3529db3c-8211-4016-99b0-582512112060}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK CL_TextLog EXTENDS CL_MasterRootClass
+VAR
+  bInit           : BOOL := FALSE;
+	bBusy						: BOOL := FALSE;
+  bRequWrite      : BOOL;
+	bError					: BOOL;
+	nErrId					: UDINT;  
+
+	step						: DWORD 	:= 0;
+  
+  sBuffer				  : POINTER TO T_StringBuffer;//text to be written
+  nByteToWrite    : UDINT;
+  nByteWritten    : UDINT;
+
+	sNetId					: T_AmsNetId := '';	(* TwinCAT system network address *)
+  sFileName				: T_MaxString; (* CSV source file path and name *)
+  hFile						: UINT		:= 0;(* File handle of the source file *)
+	fbFileOpen			: FB_FileOpen;(* Opens file *)
+	fbFileClose			: FB_FileClose;(* Closes file *)
+	fbFileWrite			: FB_FileWrite;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[IF bInit THEN
+  THIS^.Run();
+END_IF ]]></ST>
+    </Implementation>
+    <Method Name="Init" Id="{d92d23d6-8555-4cf5-91f9-31a1948301d0}">
+      <Declaration><![CDATA[METHOD Init : BOOL
+VAR_INPUT
+  stIrrLine     : ST_LineReference;
+  sPathIn       : T_MaxString;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Init := bInit := FALSE;
+IF sPathIn <> '' THEN 
+	Init := bInit := TRUE;
+	MRLineRef := stIrrLine;
+  sFileName := sPathIn;
+  RequOpenTxtLog();
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="InitAllVars" Id="{7095073d-73d2-4bf4-8bb8-8ae8cba2d3a2}">
+      <Declaration><![CDATA[METHOD PRIVATE InitAllVars
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bRequWrite	:= FALSE;
+sNetId := '';	
+hFile	:= 0;
+bBusy 	:= FALSE;
+bError	:= FALSE;
+nErrId	:= 0;
+sBuffer := 0;
+step := 110;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="IsBusy" Id="{20cbbe93-d531-4d0a-9780-238db8c2a087}">
+      <Declaration><![CDATA[PROPERTY PUBLIC IsBusy : BOOL]]></Declaration>
+      <Get Name="Get" Id="{ddf273c1-a5d8-4849-a0ae-ed22d24964a1}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IF bInit THEN
+  IsBusy := bBusy;
+ELSE
+  IsBusy := true;
+END_IF]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="IsError" Id="{43c4b3ea-2f92-4b0c-903b-42830ac7c727}">
+      <Declaration><![CDATA[PROPERTY PUBLIC IsError : BOOL]]></Declaration>
+      <Get Name="Get" Id="{5eb20add-26fd-4117-96e9-72404a7c2698}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IF bInit THEN
+  IsError := bError;
+ELSE
+  IsError := TRUE;
+END_IF]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="Release" Id="{a6e79e41-4505-4edd-950d-c68cfdaec643}">
+      <Declaration><![CDATA[METHOD PUBLIC Release : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[RequCloseTxtLog();//close text file]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RequCloseTxtLog" Id="{98e95a90-7e44-46ec-8ff4-23c2b8e18971}">
+      <Declaration><![CDATA[METHOD PRIVATE RequCloseTxtLog
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT bBusy THEN
+  bBusy := TRUE;
+  step := 10;
+END_IF
+  ]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RequOpenTxtLog" Id="{6548ca05-9dc9-4917-83ce-9c0710cd06be}">
+      <Declaration><![CDATA[METHOD PRIVATE RequOpenTxtLog
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT bBusy THEN
+  InitAllVars();
+  step := 1;
+  bBusy := TRUE;
+END_IF
+  ]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RequWriteMsg" Id="{5e18c727-9b6d-4168-a113-e1d611afa4c4}">
+      <Declaration><![CDATA[METHOD PUBLIC RequWriteMsg
+VAR_input
+	sTxtIn				: POINTER TO T_StringBuffer;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT bBusy AND sTxtIn <> 0 THEN
+  sBuffer := sTxtIn;
+  bRequWrite := TRUE;
+  step := 3;
+ELSE
+  bRequWrite := FALSE;
+  step := 3;
+END_IF
+  ]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Run" Id="{60e5af69-3c89-4434-a1f3-ccbc306e03de}">
+      <Declaration><![CDATA[METHOD PRIVATE Run
+VAR
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE step OF
+  1://open text file
+    fbFileOpen(  bExecute := FALSE  );
+    fbFileOpen( sNetId := sNetId, sPathName := sFileName, nMode := FOPEN_MODEWRITE OR FOPEN_MODETEXT,(* Open file in TEXT mode! *)
+                ePath := PATH_GENERIC, bExecute := TRUE );
+    step := 2;
+
+	2://Wait until open not busy 
+		fbFileOpen( bExecute := FALSE, bError => bError, nErrID => nErrID, hFile => hFile );
+		IF NOT fbFileOpen.bBusy THEN
+			IF NOT fbFileOpen.bError THEN
+        bBusy := FALSE;
+				step := 3;
+			ELSE(* Error: path not found or unable to create the file *)
+				step := 100;
+			END_IF
+		END_IF
+
+  3: //wait to execute a new write;
+    IF bRequWrite AND NOT bBusy THEN 
+      bRequWrite := FALSE;
+      bBusy := TRUE;
+      step := 4;
+		END_IF
+    
+	4://start write data
+    nByteToWrite := len2(sBuffer);
+		fbFileWrite( bExecute := FALSE );
+		fbFileWrite( sNetId := sNetId, hFile := hFile, pWriteBuff := sBuffer, cbWriteLen := nByteToWrite,  bExecute := TRUE );
+		step := 5;
+
+	5://Wait until write operation not busy 
+		fbFileWrite( bExecute := FALSE, bError => bError, nErrID => nErrID, pWriteBuff := sBuffer, cbWrite => nByteWritten );
+		IF NOT fbFileWrite.bBusy THEN
+			IF NOT fbFileWrite.bError AND (nByteWritten = nByteToWrite) THEN
+				step := 3;
+        bBusy := FALSE;
+			ELSE// Error
+				step := 100;
+			END_IF
+		END_IF
+
+	10://Close text file
+		fbFileClose( bExecute := FALSE );
+		fbFileClose( sNetId := sNetId, hFile := hFile, bExecute := TRUE );
+		step := 11;
+
+	11://Wait until close not busy
+		fbFileClose( bExecute := FALSE, bError => bError, nErrID => nErrID );
+		IF ( NOT fbFileClose.bBusy ) THEN
+			hFile := 0;
+			step := 100;
+		END_IF
+
+	100: //Error or ready step => cleanup
+		IF ( hFile <> 0 ) THEN
+			step := 10; //Close the source file
+		ELSE
+			bBusy := FALSE;
+			step := 110;
+		END_IF
+  
+  110:
+    ;//do nothinh parked after calling Release or Error
+
+END_CASE
+
+
+
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,453 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="CL_TelegramBOT" Id="{54eb5799-b03c-4f32-b236-06f40e6dcd61}" SpecialFunc="None">
+    <Declaration><![CDATA[{attribute 'enable_dynamic_creation'}
+FUNCTION_BLOCK CL_TelegramBOT EXTENDS CL_MasterRootClass
+VAR CONSTANT //constant configuration parameters fro FB_IotHttpClient configuration
+	sHostNameC 					: T_MaxString:='api.telegram.org';
+	nHostPortC  				: UINT := 443; //https port
+	bKeepAliveC 				: BOOL := FALSE;
+	bNoServerCertCheckC : BOOL := TRUE;
+	tConnectionTimeoutC : TIME := T#10S;
+END_VAR
+VAR
+	boBOT_MSGOk 				: BOOL := FALSE;
+		
+	sBOTKey 						: T_MaxString;// BOT key to exchange operator messages
+	sDebugID 						: STRING(64);//32
+	sAlarmID 						: STRING(64);//32
+	sBOTname 						: STRING(64);//40
+	sBOTusername 				: STRING(64);//40
+	
+	bInit		            : BOOL := FALSE;
+	
+	fbHttpClientTelegram: FB_IotHttpClient;//HTTP client communication
+	fbBOTRequest   			: FB_IotHttpRequest;
+	
+	sBOTMsgBuffer_P			: POINTER TO T_StringBuffer;//STRING(2000);//string buffer
+	sBOT_APIMethod_P 		: POINTER TO T_StringBuffer;//STRING(3500);//used in HTTPGetTelegram
+	sBOTReturnContent_P : POINTER TO T_StringBuffer;//STRING(2000);//used in HTTPGetTelegram
+  
+	RisingEdge          : R_TRIG;
+	HTTPGetTelegramStm  : BYTE := 0;
+  nBOTReqCnt          : UDINT := 0;    
+  nBOTContentCnt      : UDINT := 0;
+    
+  nErrCount           : UDINT;
+	bBOTSend						: BOOL;
+	bBOTError						: BOOL;
+	bBOTBusy            : BOOL := FALSE; 
+	
+	//used in
+	bJSONReturnExec			: BOOL := FALSE;
+	JSONReturnStm				: enBOT_API := enBOT_API.none;
+	nJSONResCnt         : UDINT := 0;
+	
+	//returned values from getMe
+	stJsonGetMe					: ST_getMe;
+	bJsonGetMe					: BOOL;
+	bBOTCorret					: BOOL  := TRUE; //the BOT is correctly identified after the initial getMe Api call 
+END_VAR
+{attribute 'TcEncoding':='UTF-8'}]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// https://theasciicode.com.ar/ascii-printable-characters/capital-letter-h-uppercase-ascii-code-72.html
+// https://www.urlencoder.org/
+//IMPORTANT ATTENTION: forbidden words for Telegram messages otherwise FB_IotHttpRequest FAILS!!
+//HandlingLine HMI
+IF bInit THEN
+	IF fbHttpClientTelegram.bConfigured AND bBOTCorret THEN
+		fbHttpClientTelegram.Execute();
+		HTTPGetTelegramExec();
+		JSONBOTReturnExec();
+	END_IF
+END_IF
+]]></ST>
+    </Implementation>
+    <Method Name="HTTPGetTelegramExec" Id="{2c4cb91f-4be0-454f-bf8f-b47988ae7ca8}">
+      <Declaration><![CDATA[METHOD PRIVATE HTTPGetTelegramExec
+VAR
+   nBOTReturnContentSize 		: UDINT;
+	 HTTPStatusCodeFromServer	: UINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (bBOTSend) THEN
+	RisingEdge(CLK:= TRUE );
+	CASE HTTPGetTelegramStm OF
+		0: IF RisingEdge.Q THEN 
+				IF fbBOTRequest.SendRequest(sUri:=sBOT_APIMethod_P^, fbClient:=fbHttpClientTelegram, eRequestType:=ETcIotHttpRequestType.HTTP_Get, 0, 0, 0) THEN                
+					HTTPGetTelegramStm:= 1;
+					nBOTReqCnt:= nBOTReqCnt+1;
+					bBOTBusy:= TRUE;
+					bBOTError:= FALSE;
+				END_IF                    
+    	END_IF
+		1: IF NOT fbBOTRequest.bBusy THEN
+        bBOTError:= TRUE;
+        IF NOT fbBOTRequest.bError THEN  
+          bBOTError:= NOT fbBOTRequest.GetContent(pContent:= sBOTReturnContent_P,
+					nContentSize:= nBOTReturnContentSize:= SIZEOF(T_StringBuffer),
+					bSetNullTermination:= TRUE);
+					IF JSONReturnStm = enBOT_API.getUpdates THEN
+						bBOTError := FALSE;
+						//the JSON answer from getUpdates methos could be very large; in this case a truncated answer will be stored in sBOTReturnContent
+						//fbBOTRequest.GetContent will return an error -> in this case the error is always cleared
+					END_IF
+					bBOTSend := FALSE; //do not execute any longer HTTPGetTelegramExec
+					//bBOTError:= FALSE -> ok sBOTReturnContent returned good value
+					HTTPStatusCodeFromServer := fbBOTRequest.nStatusCode;
+					IF NOT bBOTError AND HTTPStatusCodeFromServer >= 200 AND HTTPStatusCodeFromServer < 300 THEN
+						bJSONReturnExec := TRUE;
+						nBOTContentCnt:= nBOTContentCnt+1;
+					ELSE
+						bBOTError := true;//server answer with HTTP error
+					END_IF
+        END_IF
+				RisingEdge(CLK:= FALSE);
+				HTTPGetTelegramStm := 0;
+				bBOTBusy:= FALSE;
+				IF bBOTError THEN
+					nErrCount:= nErrCount+1;
+				END_IF
+    	END_IF
+	END_CASE
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Init" Id="{3fed8c44-a334-43f5-bbb2-46da41b9667a}">
+      <Declaration><![CDATA[METHOD PUBLIC Init : BOOL
+VAR_INPUT
+  stIrrLine       : ST_LineReference;
+	stTelegramIn    : ST_TelegramInit;
+END_VAR
+
+VAR	
+	fbFormatStr			: FB_FormatString;
+	sHTTP_BOTAnswer	: STRING(500);
+  bufferSize      : UDINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bInit := Init := LEN(stTelegramIn.sBOTKey) >0 AND LEN(stTelegramIn.sBOTusername) >0 AND LEN(stTelegramIn.sBOTname) >0 AND (LEN(stTelegramIn.sDebugID) >0 OR Len(stTelegramIn.sAlarmID) > 0);
+IF Init THEN	
+  MRLineRef := stIrrLine;
+  
+  sBOTKey := stTelegramIn.sBOTKey;
+  sDebugID := stTelegramIn.sDebugID;
+  sAlarmID := stTelegramIn.sAlarmID;
+  sBOTname := stTelegramIn.sBOTname;
+  sBOTusername := stTelegramIn.sBOTusername;
+  
+  bufferSize := SIZEOF(T_StringBuffer)+4;
+  sBOTMsgBuffer_P := __NEW(BYTE, bufferSize);
+  sBOT_APIMethod_P := __NEW(BYTE, bufferSize);
+  sBOTReturnContent_P := __NEW(BYTE, bufferSize);
+  
+  bInit := Init := sBOTMsgBuffer_P <> 0 AND sBOT_APIMethod_P <> 0 AND sBOTReturnContent_P <> 0;
+  IF Init THEN
+    sBOTMsgBuffer_P^:= '';
+    sBOT_APIMethod_P^:= '';
+    sBOTReturnContent_P^:= '';
+    IF NOT fbHttpClientTelegram.bConfigured THEN
+      //fbHttpClientTelegram.stTLS.sCA:='C:\TwinCAT\3.1\Config\Certificates\TelegramRoot.cer';  //server certificate
+      fbHttpClientTelegram.sHostName := sHostNameC;
+      fbHttpClientTelegram.nHostPort := nHostPortC;
+      fbHttpClientTelegram.bKeepAlive := bKeepAliveC;
+      fbHttpClientTelegram.tConnectionTimeout:=tConnectionTimeoutC;
+      fbHttpClientTelegram.stTLS.bNoServerCertCheck:=bNoServerCertCheckC; //avoid certificate
+      fbHttpClientTelegram.Execute();		
+      bInit := Init := TRUE;
+      bBOTBusy := FALSE;//no request
+      RequGetMe(); //must be called after having initialized bInit //getUpdates(); 
+      bBOTBusy := TRUE; //must be set to TRUE -> HTTP BOT Api request getME still not executed and done
+    ELSE
+      bInit := Init := FALSE;
+    END_IF
+  END_IF
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="IsBusy" Id="{9cb872b2-8e55-4dac-a5fc-f08c6bddd514}">
+      <Declaration><![CDATA[PROPERTY PUBLIC IsBusy : BOOL]]></Declaration>
+      <Get Name="Get" Id="{dff77910-6290-49b4-9c82-484e1d4f4feb}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IF bInit THEN
+  IsBusy := bBOTBusy;
+ELSE
+  IsBusy := TRUE;
+END_IF]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="IsError" Id="{bf012ef8-a57a-4759-8dfe-669c8ff91776}">
+      <Declaration><![CDATA[PROPERTY PUBLIC IsError : BOOL]]></Declaration>
+      <Get Name="Get" Id="{93b590f6-2835-4d3d-a78a-dfac192cb51b}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IF bInit THEN
+  IsError := bBOTError;
+ELSE
+  IsError := true;
+END_IF]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="JSONBOTReturnExec" Id="{0b3b067d-4169-4851-a7df-5fb02742f41c}">
+      <Declaration><![CDATA[METHOD PRIVATE JSONBOTReturnExec
+VAR
+	bJSONOk: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF bJSONReturnExec THEN
+	CASE JSONReturnStm OF
+		enBOT_API.none: 
+			bJSONReturnExec := FALSE;
+			
+		enBOT_API.getMe:
+			bJSONOk := JSONParser_getMe();
+			bJSONReturnExec := FALSE; //stop execution 
+			JSONReturnStm := enBOT_API.none;
+			
+		enBOT_Api.sendMsg:
+			//bJSONOk := JSONParser_sendMsg();  TO DO
+			bJSONReturnExec := FALSE; //stop execution 
+			JSONReturnStm := enBOT_API.none;
+		
+		enBOT_API.getUpdates:
+			//bJSONOk := JSONParser_getUpdates();  To DO
+			bJSONReturnExec := FALSE; //stop execution 
+			JSONReturnStm := enBOT_API.none;			
+	END_CASE
+	sBOTReturnContent_P^ := '';
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="JSONParser_getMe" Id="{49adee77-7de5-486c-a1ba-7891cd137a75}">
+      <Declaration><![CDATA[METHOD PRIVATE JSONParser_getMe : BOOL
+VAR
+	jsonDoc 	: SJsonValue;
+	fbJson  	: FB_JsonDomParser;
+
+	jsonPtmp, jsonP_result	: SJsonValue;
+	jsonS_ok, jsonS_result	: T_MaxString;
+	
+  	fbJsonDataType  : FB_JsonReadWriteDataType;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[JSONParser_getMe := FALSE;
+jsonDoc := fbBOTRequest.GetJsonDomContent(fbJson);
+IF jsonDoc <> 0 THEN
+	jsonDoc := fbJson.ParseDocument(sBOTReturnContent_P^);
+	IF jsonDoc <> 0 THEN
+		jsonPtmp := fbJson.FindMember(jsonDoc, 'ok');
+		jsonP_result := fbJson.FindMember(jsonDoc, 'result');
+		IF (jsonPtmp <> 0) AND (jsonP_result <> 0) THEN
+			jsonS_ok := fbJson.GetJson(jsonPtmp);
+			bJsonGetMe := StrEqual(jsonS_ok, 'true');
+			IF bJsonGetMe THEN
+				jsonS_result := fbJson.GetJson(jsonP_result);
+				IF jsonS_result <> '' THEN 
+					//the following line is not correctly executed in library !!!   why?
+					//JSONParser_getMe := fbJsonDataType.SetSymbolFromJson(jsonS_result,'ST_getMe',SIZEOF(stJsonGetMe), ADR(stJsonGetMe));
+					//must be replaced with the following lines!!!!!
+					jsonPtmp := fbJson.FindMember(jsonP_result, 'is_bot');				
+					stJsonGetMe.is_bot := StrEqual(fbJson.GetJson(jsonPtmp), 'true');
+					jsonPtmp := fbJson.FindMember(jsonP_result, 'first_name');
+					stJsonGetMe.first_name := fbJson.GetJson(jsonPtmp);
+					stJsonGetMe.first_name := DELETE(stJsonGetMe.first_name,1,1);
+					stJsonGetMe.first_name := DELETE(stJsonGetMe.first_name,1,len(stJsonGetMe.first_name));
+					jsonPtmp := fbJson.FindMember(jsonP_result, 'username');
+					stJsonGetMe.username := fbJson.GetJson(jsonPtmp,);
+					stJsonGetMe.username := DELETE(stJsonGetMe.username,1,1);
+					stJsonGetMe.username := DELETE(stJsonGetMe.username,1,len(stJsonGetMe.username));					
+					nJSONResCnt:= nJSONResCnt+1;
+					JSONParser_getMe := TRUE;
+				END_IF
+			END_IF
+		END_IF
+	END_IF   
+END_IF
+
+bBOTCorret := JSONParser_getMe AND stJsonGetMe.is_bot AND StrEqual(stJsonGetMe.first_name, sBOTname) AND StrEqual(stJsonGetMe.username, sBOTusername);
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Release" Id="{6e185b76-e32c-461b-8af1-74cdc68e098b}">
+      <Declaration><![CDATA[METHOD PUBLIC Release : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bInit := FALSE;
+IF sBOTMsgBuffer_P <> 0  THEN 
+  __DELETE(sBOTMsgBuffer_P);
+END_IF
+
+IF sBOT_APIMethod_P <> 0 THEN 
+  __DELETE(sBOT_APIMethod_P);
+END_IF
+
+IF sBOTReturnContent_P <> 0 THEN 
+  __DELETE(sBOTReturnContent_P);
+END_IF
+
+Release := sBOTMsgBuffer_P = 0 AND sBOT_APIMethod_P = 0 AND sBOTReturnContent_P = 0;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RequGetMe" Id="{f8cebe78-5186-43e5-8fbf-35e4692e749e}">
+      <Declaration><![CDATA[METHOD PUBLIC RequGetMe
+VAR
+	fbFormatStr	  : FB_FormatString;
+	bTmp		      : BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF fbHttpClientTelegram.bConfigured AND NOT IsBusy AND bInit THEN //NOT bBOTBusy -> the BOT Api command can be executed
+  fbFormatStr(
+		sFormat	:= '/bot%s/getMe', //BOT Api method getMe
+		arg1	:= F_STRING(sBOTKey), 
+		bError	=> bTmp,  
+		nErrId	=> , 
+		sOut	=> sBOT_ApiMethod_P^);//write Telegram BOT API HTTP string
+		
+		bBOTSend := NOT bTmp; //enable HTTPGetTelegram method execution  
+		IF NOT bTmp THEN
+			JSONReturnStm := enBOT_API.getMe; //JSON parser is instructed to parse a return msg from getMe BOT Api
+		ELSE
+			sBOT_ApiMethod_P^:='';  //clear Telegram BOT API HTTP string
+			JSONReturnStm := enBOT_API.none; //JSON parser do nothing
+		END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RequGetUpdates" Id="{18e6b2eb-cc93-45ab-b004-218d318af115}">
+      <Declaration><![CDATA[METHOD PUBLIC RequGetUpdates
+VAR
+	fbFormatStr	  : FB_FormatString;
+	bTmp		      : BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF fbHttpClientTelegram.bConfigured AND NOT IsBusy AND bInit THEN  //NOT bBOTBusy -> the BOT Api command can be executed
+	fbFormatStr(
+		sFormat	:= '/bot%s/getUpdates', //BOT Api method getMe
+		arg1	:= F_STRING(sBOTKey), 
+		bError	=> bTmp,  
+		nErrId	=> , 
+		sOut	=> sBOT_ApiMethod_P^);//write Telegram BOT API HTTP string
+		
+		bBOTSend := NOT bTmp; //enable HTTPGetTelegram method execution  
+		IF NOT bTmp THEN
+			JSONReturnStm := enBOT_API.getUpdates; //JSON parser is instructed to parse a return msg from getUpdates BOT Api
+		ELSE
+			sBOT_ApiMethod_P^:='';  //clear Telegram BOT API HTTP string
+			JSONReturnStm := enBOT_API.none; //JSON parser do nothing
+		END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RequSendMsgToAlarm" Id="{ff37b201-7b51-417d-8b55-50ae41f4f727}">
+      <Declaration><![CDATA[METHOD PUBLIC RequSendMsgToAlarm
+VAR_INPUT
+	sTxtIn				: POINTER TO T_StringBuffer;
+END_VAR
+VAR
+	fbFormatStr		: FB_FormatString;
+	bTmpErr				: BOOL;
+	len 					: UINT;
+  sTmp          : T_MaxString;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF fbHttpClientTelegram.bConfigured AND NOT IsBusy AND bInit THEN //NOT bBOTBusy -> the BOT Api command can be executed
+  //ATTENTION DON'T WRITE INSIDE THE POINTER sTxtIn!!!
+  sBOTMsgBuffer_P^:='';//cleare previous stored data
+  len := SIZEOF(T_StringBuffer);
+  CONCAT2(sBOTMsgBuffer_P, sTxtIn, sBOTMsgBuffer_P, len);
+	//Telegram API new line character is %0A
+	//to insert it inside format string the Telegram use %%0A
+  sTmp := sAlarmID;
+	fbFormatStr(
+		sFormat	:= '/bot%s/sendMessage?chat_id=%s&text=', 
+		arg1	:= F_STRING(sBOTKey), 
+		arg2	:= F_STRING(sTmp), 
+		bError	=> bTmpErr,  
+		nErrId	=> , 
+		sOut	=> sBOT_ApiMethod_P^);
+		
+		//CONCAT2 handles long string; fbFormatStr fails with long string
+		IF NOT bTmpErr THEN
+			len := SIZEOF(T_StringBuffer);
+			bTmpErr := NOT CONCAT2(sBOT_ApiMethod_P,sBOTMsgBuffer_P,sBOT_ApiMethod_P, len);//write Telegram BOT API HTTP string
+			JSONReturnStm := enBOT_API.sendMsg; //JSON parser is instructed to parse a return msg from sed message BOT Api
+		END_IF
+		bBOTSend := NOT bTmpErr; //enable HTTPGetTelegram method execution,  	
+		IF bTmpErr THEN
+			sBOT_ApiMethod_P^:='';  //clear Telegram BOT API HTTP string
+			JSONReturnStm := enBOT_API.none; //JSON parser do nothing
+		END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RequSendMsgToInfo" Id="{d04f9b6c-a328-47e0-87da-06d734a7af6e}">
+      <Declaration><![CDATA[METHOD PUBLIC RequSendMsgToInfo
+VAR_INPUT
+	sTxtIn				: POINTER TO T_StringBuffer;
+END_VAR
+VAR
+	fbFormatStr		: FB_FormatString;
+	bTmpErr				: BOOL;
+	len 					: UINT;
+  sTmp          : T_MaxString;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF fbHttpClientTelegram.bConfigured AND NOT IsBusy AND bInit THEN //NOT bBOTBusy -> the BOT Api command can be executed
+  //ATTENTION DON'T WRITE INSIDE THE POINTER sTxtIn!!!
+  sBOTMsgBuffer_P^:='';//cleare previous stored data
+  len := SIZEOF(T_StringBuffer);
+  CONCAT2(sBOTMsgBuffer_P, sTxtIn, sBOTMsgBuffer_P, len);
+
+	//Telegram API new line character is %0A
+	//to insert it inside la format string the Telegram use %%0A
+  sTmp := sDebugID;
+	fbFormatStr(
+		sFormat	:= '/bot%s/sendMessage?chat_id=%s&text=', 
+		arg1	:= F_STRING(sBOTKey), 
+		arg2	:= F_STRING(sTmp), 
+		bError	=> bTmpErr,  
+		nErrId	=> , 
+		sOut	=> sBOT_ApiMethod_P^);
+		
+		//CONCAT2 handles long string
+		IF NOT bTmpErr THEN
+			len := SIZEOF(T_StringBuffer);
+			bTmpErr := NOT CONCAT2(sBOT_ApiMethod_P,sBOTMsgBuffer_P,sBOT_ApiMethod_P,len);//write Telegram BOT API HTTP string
+			JSONReturnStm := enBOT_API.sendMsg; //JSON parser is instructed to parse a return msg from sed message BOT Api
+		END_IF
+		bBOTSend := NOT bTmpErr; //enable HTTPGetTelegram method execution  	
+		IF bTmpErr THEN
+			sBOT_ApiMethod_P^:='';  //clear Telegram BOT API HTTP string
+			JSONReturnStm := enBOT_API.none; //JSON parser do nothing
+		END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="StrEqual" Id="{7fec560e-1bbc-4e99-9dfa-87def25d3489}">
+      <Declaration><![CDATA[METHOD PRIVATE StrEqual : BOOL
+VAR_INPUT
+	Str1 : T_MaxString;
+	Str2 : T_MaxString;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[StrEqual := (LEN(Str1) = LEN(Str2)) AND (FIND(Str1, Str2) = 1);]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>
