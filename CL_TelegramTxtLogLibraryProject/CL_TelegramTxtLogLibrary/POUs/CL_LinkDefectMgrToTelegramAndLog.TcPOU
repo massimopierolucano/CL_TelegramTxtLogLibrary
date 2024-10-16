@@ -143,7 +143,7 @@ VAR
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[bInit := Init := FALSE;
-IF __ISVALIDREF(DefectMngr) AND __ISVALIDREF(TelegramBOT) AND __ISVALIDREF(TxtLog) THEN 
+IF __ISVALIDREF(DefectMngr) AND __ISVALIDREF(TelegramBOT) AND __ISVALIDREF(TxtLog) and __IsValidRef(ActTime) THEN 
 	_DefectMngr REF= DefectMngr;
   _TelegramBOT REF= TelegramBOT;
   _TxtLog REF= TxtLog;
