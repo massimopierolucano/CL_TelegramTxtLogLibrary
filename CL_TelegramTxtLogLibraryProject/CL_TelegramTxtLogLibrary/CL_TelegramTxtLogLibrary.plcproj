@@ -37,7 +37,7 @@
     <Released>true</Released>
     <Company>CleanGreens SA</Company>
     <Title>CL_TelegramTxtLogLibrary</Title>
-    <ProjectVersion>2.0</ProjectVersion>
+    <ProjectVersion>2.0.1</ProjectVersion>
     <DefaultNamespace>
     </DefaultNamespace>
     <Author>Massimo Lucano</Author>
@@ -78,7 +78,7 @@
   </ItemGroup>
   <ItemGroup>
     <PlaceholderReference Include="CGS_DefectManager">
-      <DefaultResolution>CL_DefectManager, * (CleanGreensSA)</DefaultResolution>
+      <DefaultResolution>CL_DefectManager, * (CleanGreens SA)</DefaultResolution>
       <Namespace>CL_DefectManager</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="CGS_ErrorsDatabase">
