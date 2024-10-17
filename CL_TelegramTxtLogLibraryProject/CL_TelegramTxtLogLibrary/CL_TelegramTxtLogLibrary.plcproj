@@ -34,7 +34,7 @@
     <SelectedLibraryCategories>
       <Id xmlns="">{43ba0754-6919-43b3-a5b3-d04b4efb2ad6}</Id>
     </SelectedLibraryCategories>
-    <Released>true</Released>
+    <Released>false</Released>
     <Company>CleanGreens SA</Company>
     <Title>CL_TelegramTxtLogLibrary</Title>
     <ProjectVersion>2.0.2</ProjectVersion>
@@ -82,8 +82,7 @@
       <Namespace>CL_DefectManager</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="CGS_ErrorsDatabase">
-      <DefaultResolution>CL_ErrorsDatabase, * (CleanGreensSA)</DefaultResolution>
-      <Namespace>CL_ErrorsDatabase</Namespace>
+      <DefaultResolution>CL_ErrorsDatabase, * (CleanGreens SA)</DefaultResolution>
     </PlaceholderReference>
     <PlaceholderReference Include="CGS_ObjectsLibrary">
       <DefaultResolution>CL_CleanGreensObjectsLibrary, * (CleanGreens SA)</DefaultResolution>
