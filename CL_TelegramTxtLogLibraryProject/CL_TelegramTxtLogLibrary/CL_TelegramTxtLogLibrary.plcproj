@@ -37,7 +37,7 @@
     <Released>true</Released>
     <Company>CleanGreens SA</Company>
     <Title>CL_TelegramTxtLogLibrary</Title>
-    <ProjectVersion>2.1</ProjectVersion>
+    <ProjectVersion>2.1.1</ProjectVersion>
     <DefaultNamespace>
     </DefaultNamespace>
     <Author>Massimo Lucano</Author>
@@ -51,13 +51,7 @@
     <Compile Include="DUTs\E_MsgType.TcDUT">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="DUTs\ST_ConfigMsgBuild.TcDUT">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="DUTs\ST_getMe.TcDUT">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="DUTs\ST_ShowMsgFields.TcDUT">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="DUTs\ST_TelegramInit.TcDUT">
@@ -89,6 +83,7 @@
     </PlaceholderReference>
     <PlaceholderReference Include="CGS_ErrorsDatabase">
       <DefaultResolution>CL_ErrorsDatabase, * (CleanGreens SA)</DefaultResolution>
+      <Namespace>CL_ErrorsDatabase</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="CGS_ObjectsLibrary">
       <DefaultResolution>CL_CleanGreensObjectsLibrary, * (CleanGreens SA)</DefaultResolution>
