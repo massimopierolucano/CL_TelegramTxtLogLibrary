@@ -34,10 +34,10 @@
     <SelectedLibraryCategories>
       <Id xmlns="">{43ba0754-6919-43b3-a5b3-d04b4efb2ad6}</Id>
     </SelectedLibraryCategories>
-    <Released>false</Released>
+    <Released>true</Released>
     <Company>CleanGreens SA</Company>
     <Title>CL_TelegramTxtLogLibrary</Title>
-    <ProjectVersion>2.0.2</ProjectVersion>
+    <ProjectVersion>2.1</ProjectVersion>
     <DefaultNamespace>
     </DefaultNamespace>
     <Author>Massimo Lucano</Author>
@@ -51,7 +51,13 @@
     <Compile Include="DUTs\E_MsgType.TcDUT">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="DUTs\ST_ConfigMsgBuild.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="DUTs\ST_getMe.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\ST_ShowMsgFields.TcDUT">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="DUTs\ST_TelegramInit.TcDUT">

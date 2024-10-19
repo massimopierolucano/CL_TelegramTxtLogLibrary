@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <DUT Name="ST_ConfigMsgBuild" Id="{1e03d47f-f01a-40c3-b81e-d7f7d0a36546}">
+    <Declaration><![CDATA[//structure to configure how messages are built
+TYPE ST_ConfigMsgBuild :
+STRUCT
+  AlarmMsg          : ST_ShowMsgFields;
+  InfoMsg           : ST_ShowMsgFields;
+  RegisterMsg       : ST_ShowMsgFields;
+  bShowRegisterMsg  : BOOL := FALSE;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

@@ -12,13 +12,14 @@ VAR
   
   indDfList					      : UINT := 1;
 
-  _bShowDateTime          : BOOL := FALSE;
+  _stConfigMsgBuild       : ST_ConfigMsgBuild;
+  _stShow                 : ST_ShowMsgFields;
+  
   _bShowRegisterMsg       : BOOL := FALSE;
-	_bMakeTxtLOG 		        : BOOL := FALSE;
   _bAllDefectsRegistered  : BOOL := FALSE;
 	
 	sTelegramMsg_P	        : POINTER TO T_StringBuffer;//used to generate very long Telegram messages limited to 3500 chars
-	sTextOut_P          : POINTER TO T_StringBuffer;//used to generate short ADS console messages limited to 255 chars
+	sTextOut_P              : POINTER TO T_StringBuffer;//used to generate short ADS console messages limited to 255 chars
   
 	pDf			      		      : POINTER TO CL_Defect;
 	iDf		        		      : ITF_Defect;
@@ -81,49 +82,42 @@ END_VAR
     <Method Name="BuildMsg" Id="{a5846a05-374c-4f5a-b86f-1042d24e98b9}">
       <Declaration><![CDATA[METHOD PRIVATE BuildMsg : BOOL
 VAR_INPUT
-  MsgType : E_MsgType;
+  MsgType       : E_MsgType;
 END_VAR
 VAR
-  bShowIstance            : BOOL;
-  bShowLongError          : BOOL;
-  bShowLongClass          : BOOL;
-  sStartMsg               : T_MAXSTRING;
+  sStartMsg     : T_MAXSTRING;
+  
 END_VAR
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[//%0A telegram new line
 CASE MsgType OF
   E_MsgType.Alarm:
-    bShowIstance := FALSE;
-    bShowLongError := true;
-    bShowLongClass := FALSE;
-    sStartMsg := 'ALLARM MESSAGE';
+    sStartMsg := _stConfigMsgBuild.AlarmMsg.sStartMsg;
+    _stShow := _stConfigMsgBuild.AlarmMsg;
   E_MsgType.Info:
-    bShowIstance := TRUE;
-    bShowLongError := FALSE;
-    bShowLongClass := FALSE;
-    sStartMsg := 'INFO MESSAGE';
+    sStartMsg := _stConfigMsgBuild.InfoMsg.sStartMsg;
+    _stShow := _stConfigMsgBuild.InfoMsg;
   E_MsgType.Register:
-    bShowIstance := TRUE;
-    bShowLongError := FALSE;
-    bShowLongClass := FALSE;
-    sStartMsg := 'Register new defect';
+    sStartMsg := _stConfigMsgBuild.RegisterMsg.sStartMsg;
+    _stShow := _stConfigMsgBuild.RegisterMsg;
 END_CASE   
 sTelegramMsg_P^ := '';
 sTextOut_P^ := '';
-BuildMsg := pDf^.BuildStringMsg(sMsgOut_P := sTelegramMsg_P, 
-                                    sTextOut_P := sTextOut_P, 
-                                    bConsoleMsg := _bMakeTxtLOG,
-                                    bShowIstance := bShowIstance,
-                                    bShowLongClass := bShowLongClass,
-                                    bShowLongError := bShowLongError,
-                                    bShowRemedMsg := FALSE);    
-                                    
-IF _bShowDateTime THEN 
+
+BuildMsg := pDf^.BuildStringMsg(sMsgOut_P := sTelegramMsg_P, sTextOut_P := sTextOut_P, stShow := _stShow);
+                                      
+IF _stShow.bDateTime THEN 
   AddDateTime(sStartMsg);
 END_IF  
-CONCAT2(ADR(sStartMsg),sTelegramMsg_P,sTelegramMsg_P,SIZEOF(sTelegramMsg_P^));
-CONCAT2(ADR(sStartMsg),sTextOut_P,sTextOut_P,SIZEOF(sTextOut_P^));]]></ST>
+
+IF _stShow.bTelegram THEN
+  CONCAT2(ADR(sStartMsg),sTelegramMsg_P,sTelegramMsg_P,SIZEOF(sTelegramMsg_P^));
+END_IF
+
+IF _stShow.bTxtLog THEN
+  CONCAT2(ADR(sStartMsg),sTextOut_P,sTextOut_P,SIZEOF(sTextOut_P^));
+END_IF]]></ST>
       </Implementation>
     </Method>
     <Method Name="Init" Id="{e53ab38c-96f3-4595-9dcb-80606fd15102}">
@@ -134,9 +128,7 @@ VAR_INPUT
   TelegramBOT      : REFERENCE TO CL_TelegramBOT;
   TxtLog           : REFERENCE TO CL_TextLog;
   ActTime          : REFERENCE TO CL_ActTimeDate;
-  bShowDateTime    : BOOL := FALSE;
-  bShowRegisterMsg : BOOL := FALSE;
-	bShowTxtLog 		 : BOOL := FALSE;
+  stConfigMsg      : ST_ConfigMsgBuild;
 END_VAR
 VAR
   bufferSize       : UDINT;
@@ -152,15 +144,12 @@ IF __ISVALIDREF(DefectMngr) AND __ISVALIDREF(TelegramBOT) AND __ISVALIDREF(TxtLo
   MRLineRef := stIrrLine;
 
   indDfList := 1;
-	_bShowDateTime := bShowDateTime;
+	_stConfigMsgBuild := stConfigMsg;
+  _bShowRegisterMsg := _stConfigMsgBuild.bShowRegisterMsg;
   
   bufferSize := SIZEOF(T_StringBuffer)+4;
   sTelegramMsg_P := __NEW(BYTE, bufferSize);
   sTextOut_P := __NEW(BYTE, bufferSize);
-
-  _bShowDateTime    := bShowDateTime;
-  _bShowRegisterMsg := bShowRegisterMsg;
-	_bMakeTxtLOG 		  := bShowTxtLog;
 
   bInit := Init := sTelegramMsg_P <> 0 AND sTextOut_P <> 0;
 END_IF
@@ -212,7 +201,7 @@ END_VAR
         IF (indDfList > _DefectMngr.nMaxDefects) THEN //all Defect Register Messages sent
           _bShowRegisterMsg := false;//Register all defects done; the object can send starting from now Alarm and Info messages
 				END_IF
-			else
+			ELSE
         bDefectToSend := pDf^.State = E_DefectState.Active OR pDf^.State = E_DefectState.ActiveAndAck;
         IF bDefectToSend THEN 
           RunAlarm();        
@@ -241,10 +230,12 @@ END_VAR
 IF pDf^.CanSendAlarmMsg AND (pDf^.Severity > TcEventSeverity.Info) THEN //Telegram msg not yet sent   
   //Critical, Error and Warning Defect are sent to Alarm group
   IF BuildMsg(E_MsgType.Alarm) THEN
-    IF _bMakeTxtLOG THEN 
+    IF _stShow.bTxtLog THEN 
       _TxtLog.RequWriteMsg(sTextOut_P);
     END_IF
-    _TelegramBOT.RequSendMsgToAlarm(sTelegramMsg_P);
+    IF _stShow.bTelegram THEN
+      _TelegramBOT.RequSendMsgToAlarm(sTelegramMsg_P);
+    END_IF
   END_IF					
 END_IF//pDf^.Severity... and pDf^.CanSendTelegramAlarmMsg
 ]]></ST>
@@ -262,8 +253,10 @@ END_VAR
 IF (pDf^.CanSendInfoMsg AND (pDf^.Severity <= TcEventSeverity.Info)) THEN
   //Verbose and Info Defect are sent only to InfoDebug group
   IF BuildMsg(E_MsgType.Info) THEN
-    _TelegramBOT.RequSendMsgToInfo(sTelegramMsg_P);
-    IF _bMakeTxtLOG THEN 
+    IF _stShow.bTelegram THEN
+      _TelegramBOT.RequSendMsgToInfo(sTelegramMsg_P);
+    END_IF
+    IF _stShow.bTxtLog THEN 
       _TxtLog.RequWriteMsg(sTextOut_P);
     END_IF
   END_IF
@@ -277,10 +270,12 @@ END_IF//pDf^.Severity... and pDf^.CanSendTelegramAlarmMsg]]></ST>
       <Implementation>
         <ST><![CDATA[IF pDf^.CanSendRegisterMsg AND _bShowRegisterMsg THEN //all Defect registered are sent
   IF BuildMsg(E_MsgType.Register) THEN
-   IF _bMakeTxtLOG THEN 
+   IF _stShow.bTxtLog THEN 
     _TxtLog.RequWriteMsg(sTextOut_P);
    END_IF
-   _TelegramBOT.RequSendMsgToInfo(sTelegramMsg_P);
+   IF _stShow.bTelegram THEN
+    _TelegramBOT.RequSendMsgToInfo(sTelegramMsg_P);
+   END_IF
   END_IF
 END_IF]]></ST>
       </Implementation>
