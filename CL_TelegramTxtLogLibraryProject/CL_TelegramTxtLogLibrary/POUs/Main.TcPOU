@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="Main" Id="{3b58b2d0-00e0-4f0c-9117-84390552b287}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM Main
+VAR
+  ot : CL_LinkDefectMgrToTelegramAndLog;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[ot();]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

@@ -280,5 +280,72 @@ END_IF//pDf^.Severity... and pDf^.CanSendTelegramAlarmMsg]]></ST>
 END_IF]]></ST>
       </Implementation>
     </Method>
+    <Method Name="TelegramMsgFilter" Id="{35d74495-d9fb-4c25-bcc9-f60944056ab5}">
+      <Declaration><![CDATA[METHOD PRIVATE TelegramMsgFilter : BOOL
+VAR_INPUT
+	sDatabaseMsg	:	T_MaxString;
+END_VAR
+VAR_OUTPUT
+	sTelegramMsg	:	T_MaxString;
+END_VAR
+VAR
+	sTelegramTmp	:	T_MaxString;
+	i:	INT;
+	iSafe:	INT;
+	iLengthStr:	INT	:= 0;
+	iNonAsciiPos:	INT;
+	iNumAsciiChar:	UDINT;
+
+END_VAR
+
+VAR CONSTANT
+		// Language tables - hardcoded here since part of the algorithm, and meaningless to keep them outside.
+	sASCIIcompatCharFR_AR : ARRAY [1..2,1..28] OF STRING := ['à','â','é','è','ê','ë','î','ï','ô','ù','û','ü','ÿ','ç',
+																															'À','Â','É','È','Ê','Ë','Î','Ï','Ô','Ù','Û','Ü','Ÿ','Ç',
+																															2('a'),4('e'),2('i'),'o',3('u'),'y','c',
+																															2('A'),4('E'),2('I'),'O',3('U'),'Y','C'];
+	sASCIIcompatCharDE_AR :	ARRAY [1..2,1..7] OF STRING  := ['Ä','ä','Ö','ö','Ü','ü','ß',
+																															'Ae','ae','Oe','oe','Ue','ue','ss'];
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+sTelegramTmp := sDatabaseMsg;
+IF NOT F_StringIsASCII(pSTRING := ADR(sTelegramTmp), nLen => iNumAsciiChar) THEN
+	iLengthStr := LEN(sTelegramTmp);
+//	IF C.sLangErrors = 'fr' THEN
+	IF  _DefectMngr.ErrorDB.sMsgLang = 'fr' THEN
+			FOR i:=1 TO 28 BY 1 DO
+				iSafe := 0;
+				REPEAT
+					iNonAsciiPos := FIND(sTelegramTmp,sASCIIcompatCharFR_AR[1,i]);	// Table to store inside the object, as never used elsewhere and fixed sized.
+					IF iNonAsciiPos <> 0 THEN
+						sTelegramTmp := REPLACE(sTelegramTmp,sASCIIcompatCharFR_AR[2,i],1,iNonAsciiPos);
+					END_IF
+					iSafe := iSafe + 1;
+				UNTIL iNonAsciiPos = 0 OR iSafe > iLengthStr
+				END_REPEAT;	
+			END_FOR
+//	ELSIF C.sLangErrors = 'de' THEN
+	ELSIF  _DefectMngr.ErrorDB.sMsgLang = 'de' THEN
+		FOR i:=1 TO 7 BY 1 DO
+		iSafe := 0;
+			REPEAT
+				FIND(sTelegramTmp,sASCIIcompatCharDE_AR[1,i]);
+				IF iNonAsciiPos <> 0 THEN
+					REPLACE(sTelegramTmp,sASCIIcompatCharDE_AR[2,i],1,iNonAsciiPos); // Caution, the length of the string is increasing
+				END_IF
+			iSafe := iSafe + 1;
+			UNTIL iNonAsciiPos = 0 OR iSafe > 2*iLengthStr
+			END_REPEAT
+		END_FOR
+	END_IF
+END_IF
+sTelegramMsg := sTelegramTmp;
+
+//only to reproduce the bug without filtering
+//sTelegramMsg := sDatabaseMsg;]]></ST>
+      </Implementation>
+    </Method>
   </POU>
 </TcPlcObject>
