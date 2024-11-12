@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.13">
   <POU Name="CL_TextLog" Id="{3529db3c-8211-4016-99b0-582512112060}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK CL_TextLog EXTENDS CL_MasterRootClass
 VAR
@@ -38,7 +38,7 @@ END_VAR
         <ST><![CDATA[Init := bInit := FALSE;
 IF sPathIn <> '' THEN 
 	Init := bInit := TRUE;
-	MRLineRef := stIrrLine;
+	MRCLineRef := stIrrLine;
   sFileName := sPathIn;
   RequOpenTxtLog();
 END_IF]]></ST>

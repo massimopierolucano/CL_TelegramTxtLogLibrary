@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.13">
   <POU Name="CL_LinkDefectMgrToTelegramAndLog" Id="{bd3abd17-e119-4492-88fb-5fb9a74ccd54}" SpecialFunc="None">
     <Declaration><![CDATA[{attribute 'enable_dynamic_creation'}
 FUNCTION_BLOCK CL_LinkDefectMgrToTelegramAndLog EXTENDS CL_MasterRootClass
@@ -141,7 +141,7 @@ IF __ISVALIDREF(DefectMngr) AND __ISVALIDREF(TelegramBOT) AND __ISVALIDREF(TxtLo
   _TxtLog REF= TxtLog;
   _ActTime REF= ActTime;
   
-  MRLineRef := stIrrLine;
+  MRCLineRef := stIrrLine;
 
   indDfList := 1;
 	_stConfigMsgBuild := stConfigMsg;

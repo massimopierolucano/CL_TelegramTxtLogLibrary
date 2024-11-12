@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.13">
   <POU Name="CL_TelegramBOT" Id="{54eb5799-b03c-4f32-b236-06f40e6dcd61}" SpecialFunc="None">
     <Declaration><![CDATA[{attribute 'enable_dynamic_creation'}
 FUNCTION_BLOCK CL_TelegramBOT EXTENDS CL_MasterRootClass
@@ -129,7 +129,7 @@ END_VAR
       <Implementation>
         <ST><![CDATA[bInit := Init := LEN(stTelegramIn.sBOTKey) >0 AND LEN(stTelegramIn.sBOTusername) >0 AND LEN(stTelegramIn.sBOTname) >0 AND (LEN(stTelegramIn.sDebugID) >0 OR Len(stTelegramIn.sAlarmID) > 0);
 IF Init THEN	
-  MRLineRef := stIrrLine;
+  MRCLineRef := stIrrLine;
   
   sBOTKey := stTelegramIn.sBOTKey;
   sDebugID := stTelegramIn.sDebugID;
