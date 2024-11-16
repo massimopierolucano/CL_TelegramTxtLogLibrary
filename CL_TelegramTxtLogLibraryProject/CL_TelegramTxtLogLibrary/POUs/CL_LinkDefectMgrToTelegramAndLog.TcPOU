@@ -10,7 +10,8 @@ VAR
   _TxtLog                 : REFERENCE TO CL_TextLog;
   _ActTime                :	REFERENCE TO CL_ActTimeDate;
   
-  indDfList					      : UINT := 1;
+  indListAll 					    : UINT := 1;
+  indListAct  				    : UINT := 1;
 
   _stConfigMsgBuild       : ST_ConfigMsgBuild;
   _stShow                 : ST_ShowMsgFields;
@@ -25,8 +26,7 @@ VAR
 	iDf		        		      : ITF_Defect;
 END_VAR]]></Declaration>
     <Implementation>
-      <ST><![CDATA[//IF bInit and _bAllDefectsRegistered THEN
-IF bInit THEN
+      <ST><![CDATA[IF bInit THEN
   this^.Run(); 
 END_IF]]></ST>
     </Implementation>
@@ -143,7 +143,8 @@ IF __ISVALIDREF(DefectMngr) AND __ISVALIDREF(TelegramBOT) AND __ISVALIDREF(TxtLo
   
   MRCLineRef := stIrrLine;
 
-  indDfList := 1;
+  indListAll := indListAct := 1;
+
 	_stConfigMsgBuild := stConfigMsg;
   _bShowRegisterMsg := _stConfigMsgBuild.bShowRegisterMsg;
   
@@ -192,6 +193,60 @@ END_VAR
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[IF NOT _TelegramBOT.IsBusy AND NOT _TxtLog.IsBusy THEN  
+  
+  IF _bShowRegisterMsg  THEN
+    pDf := _DefectMngr.ListAll(indListAll,0);
+    IF pDf <> 0 THEN
+      iDf := pDf^;
+      IF __QUERYPOINTER(iDf, pDf) THEN // Ctrl if address has the good interface (ITF_Default)
+        RunRegister();
+      END_IF//__QUERYPOINTER
+    END_IF//_DefectMngr.List(indDfList,0) <> 0 
+    //Telegram and TextLog not Busy --> increment at each cycle the Defect index
+    indListAll := indListAll + 1;
+    IF (indListAll > _DefectMngr.nMaxDefects) THEN //all Defect Register Messages sent
+      indListAll := 1;
+      //after first pass all register messages are sent, do not send anymore
+      //the object can send starting from now Alarm and Info messages
+      _bShowRegisterMsg := FALSE;
+    END_IF 
+  END_IF//_bShowRegisterMsg
+  
+  IF NOT _bShowRegisterMsg  THEN
+    pDf := _DefectMngr.ListCurrent(indListAct);
+    IF pDf <> 0 THEN
+      iDf := pDf^;
+      IF __QUERYPOINTER(iDf, pDf) THEN // Ctrl if address has the good interface (ITF_Default)
+        IF pDf^.DefectToSend THEN 
+          RunAlarm();
+          RunInfo();
+        END_IF
+      END_IF//__QUERYPOINTER
+    END_IF//_DefectMngr.ListCurrent(indDfList,0) <> 0 
+    indListAct := indListAct + 1;
+    IF (indListAct > _DefectMngr.nMaxDefectsView) THEN
+      indListAct := 1;
+    END_IF 
+  END_IF//not _bShowRegisterMsg
+ELSE
+  //ADSLOGSTR(ADSLOG_MSGTYPE_LOG, 'Telegram busy','');//only for debug
+  IF _TelegramBOT.IsError THEN 
+    ADSLOGSTR(ADSLOG_MSGTYPE_LOG, 'Telegram error: Telegram server answer with HTTP error','');
+  END_IF
+END_IF//TelegramBOT and TextLog both are not busy]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Run_old" Id="{feb535a0-49c1-4e05-848a-4dd6cdebebc0}">
+      <Declaration><![CDATA[METHOD PRIVATE Run_old
+VAR
+  bDefectToSend	: BOOL;
+END_VAR
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[(*
+IF NOT _TelegramBOT.IsBusy AND NOT _TxtLog.IsBusy THEN  
+  
 	IF _DefectMngr.List(indDfList,0) <> 0 THEN
 		iDf := _DefectMngr.List(indDfList,0)^;
 		IF __QUERYPOINTER(iDf, pDf) THEN // Ctrl if address has the good interface (ITF_Default)
@@ -202,11 +257,12 @@ END_VAR
           _bShowRegisterMsg := false;//Register all defects done; the object can send starting from now Alarm and Info messages
 				END_IF
 			ELSE
-        bDefectToSend := pDf^.State = E_DefectState.Active OR pDf^.State = E_DefectState.ActiveAndAck;
+        //condition OR pDf^.State = E_DefectState.OffAndNotAck added MPL date 16-11-2024
+        bDefectToSend := pDf^.State = E_DefectState.Active OR pDf^.State = E_DefectState.ActiveAndAck OR pDf^.State = E_DefectState.OffAndNotAck;
         IF bDefectToSend THEN 
           RunAlarm();        
           RunInfo();
-        END_IF//pDf^.State = E_DefectState.Active OR pDf^.State = E_DefectState.ActiveAndAck;
+        END_IF
       END_IF
     END_IF//__QUERYPOINTER
   END_IF//_DefectMngr.List(indDfList,0) <> 0 
@@ -217,7 +273,8 @@ END_VAR
     indDfList := 1;
     _bShowRegisterMsg := false;//after first pass all register messages are sent, do not send anymore
   END_IF 
-END_IF//TelegramBOT and TextLog both are not busy]]></ST>
+END_IF//TelegramBOT and TextLog both are not busy
+*)]]></ST>
       </Implementation>
     </Method>
     <Method Name="RunAlarm" Id="{71210b3a-a1f9-46bc-8caf-21060bf37ca6}">

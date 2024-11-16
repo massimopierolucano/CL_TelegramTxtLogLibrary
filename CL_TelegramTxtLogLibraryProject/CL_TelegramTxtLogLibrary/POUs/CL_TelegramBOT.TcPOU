@@ -20,7 +20,7 @@ VAR
 	sBOTusername 				: STRING(64);//40
 	
 	bInit		            : BOOL := FALSE;
-	
+ 	
 	fbHttpClientTelegram: FB_IotHttpClient;//HTTP client communication
 	fbBOTRequest   			: FB_IotHttpRequest;
 	
@@ -35,7 +35,7 @@ VAR
     
   nErrCount           : UDINT;
 	bBOTSend						: BOOL;
-	bBOTError						: BOOL;
+	bBOTHTTPError			  : BOOL := FALSE;
 	bBOTBusy            : BOOL := FALSE; 
 	
 	//used in
@@ -50,10 +50,7 @@ VAR
 END_VAR
 {attribute 'TcEncoding':='UTF-8'}]]></Declaration>
     <Implementation>
-      <ST><![CDATA[// https://theasciicode.com.ar/ascii-printable-characters/capital-letter-h-uppercase-ascii-code-72.html
-// https://www.urlencoder.org/
-//IMPORTANT ATTENTION: forbidden words for Telegram messages otherwise FB_IotHttpRequest FAILS!!
-//HandlingLine HMI
+      <ST><![CDATA[//IMPORTANT ATTENTION: forbidden words for Telegram messages otherwise FB_IotHttpRequest FAILS!! Forbidden words: HandlingLine HMI
 IF bInit THEN
 	IF fbHttpClientTelegram.bConfigured AND bBOTCorret THEN
 		fbHttpClientTelegram.Execute();
@@ -78,34 +75,35 @@ END_VAR]]></Declaration>
 					HTTPGetTelegramStm:= 1;
 					nBOTReqCnt:= nBOTReqCnt+1;
 					bBOTBusy:= TRUE;
-					bBOTError:= FALSE;
+					bBOTHTTPError:= FALSE;
 				END_IF                    
     	END_IF
 		1: IF NOT fbBOTRequest.bBusy THEN
-        bBOTError:= TRUE;
+        bBOTHTTPError:= TRUE;
         IF NOT fbBOTRequest.bError THEN  
-          bBOTError:= NOT fbBOTRequest.GetContent(pContent:= sBOTReturnContent_P,
+          bBOTHTTPError:= NOT fbBOTRequest.GetContent(pContent:= sBOTReturnContent_P,
 					nContentSize:= nBOTReturnContentSize:= SIZEOF(T_StringBuffer),
 					bSetNullTermination:= TRUE);
 					IF JSONReturnStm = enBOT_API.getUpdates THEN
-						bBOTError := FALSE;
+						bBOTHTTPError := FALSE;
 						//the JSON answer from getUpdates methos could be very large; in this case a truncated answer will be stored in sBOTReturnContent
 						//fbBOTRequest.GetContent will return an error -> in this case the error is always cleared
 					END_IF
 					bBOTSend := FALSE; //do not execute any longer HTTPGetTelegramExec
 					//bBOTError:= FALSE -> ok sBOTReturnContent returned good value
 					HTTPStatusCodeFromServer := fbBOTRequest.nStatusCode;
-					IF NOT bBOTError AND HTTPStatusCodeFromServer >= 200 AND HTTPStatusCodeFromServer < 300 THEN
+					IF NOT bBOTHTTPError AND HTTPStatusCodeFromServer >= 200 AND HTTPStatusCodeFromServer < 300 THEN
 						bJSONReturnExec := TRUE;
 						nBOTContentCnt:= nBOTContentCnt+1;
 					ELSE
-						bBOTError := true;//server answer with HTTP error
+						bBOTHTTPError := TRUE;//server answer with HTTP error
+            //ADSLOGSTR(ADSLOG_MSGTYPE_LOG, 'Telegram error: Telegram server answer with HTTP error','');//only debug
 					END_IF
         END_IF
 				RisingEdge(CLK:= FALSE);
 				HTTPGetTelegramStm := 0;
 				bBOTBusy:= FALSE;
-				IF bBOTError THEN
+				IF bBOTHTTPError THEN
 					nErrCount:= nErrCount+1;
 				END_IF
     	END_IF
@@ -190,7 +188,7 @@ END_VAR
 ]]></Declaration>
         <Implementation>
           <ST><![CDATA[IF bInit THEN
-  IsError := bBOTError;
+  IsError := bBOTHttpError;
 ELSE
   IsError := true;
 END_IF]]></ST>
